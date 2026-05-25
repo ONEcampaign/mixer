@@ -152,6 +152,14 @@ type EntityVariable struct {
 	Variable string `db:"variable"`
 }
 
+// VariableCoverageRow is a per-(entity,variable) date range from observations.
+type VariableCoverageRow struct {
+	Entity   string `db:"entity"`
+	Variable string `db:"variable"`
+	MinDate  string `db:"min_date"`
+	MaxDate  string `db:"max_date"`
+}
+
 // ProvenanceInfo represents a row that includes provenance info (id, name, URL).
 type ProvenanceInfo struct {
 	ID   string `db:"provenance_id"`

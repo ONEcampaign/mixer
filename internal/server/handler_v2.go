@@ -32,6 +32,7 @@ import (
 	"github.com/datacommonsorg/mixer/internal/server/translator"
 	v2observation "github.com/datacommonsorg/mixer/internal/server/v2/observation"
 	"github.com/datacommonsorg/mixer/internal/server/v2/resolve"
+	"github.com/datacommonsorg/mixer/internal/sqldb/sqlquery"
 	"github.com/datacommonsorg/mixer/internal/util"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
@@ -660,4 +661,49 @@ func (s *Server) V2GetLocationsRankings(
 	v2Resp.Legacy = true
 
 	return v2Resp, nil
+}
+
+// V2VariableCoverage serves precomputed custom-DC date coverage from the
+// in-memory map (no request-time SQL). Vars/pairs absent from the map are
+// omitted from the response.
+func (s *Server) V2VariableCoverage(
+	ctx context.Context, in *pb.VariableCoverageRequest,
+) (*pb.VariableCoverageResponse, error) {
+	cm := s.cachedata.Load().SQLCoverageMap(ctx)
+	resp := &pb.VariableCoverageResponse{}
+
+	for _, v := range in.GetVariables() {
+		// Variable-level envelope: key {E:"", V:v}.
+		env, ok := cm[util.EntityVariable{V: v}]
+		if !ok {
+			continue
+		}
+		if resp.VariableCoverage == nil {
+			resp.VariableCoverage = map[string]*pb.DateRange{}
+		}
+		resp.VariableCoverage[v] = coverageDateRange(env)
+
+		// Per-entity ranges when entities were requested.
+		for _, e := range in.GetEntities() {
+			er, ok := cm[util.EntityVariable{E: e, V: v}]
+			if !ok {
+				continue
+			}
+			if resp.EntityCoverage == nil {
+				resp.EntityCoverage = map[string]*pb.EntityRanges{}
+			}
+			if resp.EntityCoverage[v] == nil {
+				resp.EntityCoverage[v] = &pb.EntityRanges{
+					Entity: map[string]*pb.DateRange{},
+				}
+			}
+			resp.EntityCoverage[v].Entity[e] = coverageDateRange(er)
+		}
+	}
+	return resp, nil
+}
+
+// coverageDateRange converts a sqlquery.DateRange to its proto equivalent.
+func coverageDateRange(dr sqlquery.DateRange) *pb.DateRange {
+	return &pb.DateRange{Earliest: dr.Earliest, Latest: dr.Latest}
 }

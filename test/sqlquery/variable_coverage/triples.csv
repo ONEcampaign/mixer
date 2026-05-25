@@ -1,0 +1,7 @@
+subject_id,predicate,object_id,object_value
+var1,typeOf,StatisticalVariable,
+var2,typeOf,StatisticalVariable,
+var3,typeOf,StatisticalVariable,
+country/KEN,typeOf,Country,
+country/USA,typeOf,Country,
+country/MEX,typeOf,Country,

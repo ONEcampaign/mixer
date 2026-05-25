@@ -34,6 +34,7 @@ var statements = struct {
 	getContainedInPlace                       string
 	getEntityVariables                        string
 	getAllEntitiesAndVariables                string
+	getVariableCoverage                       string
 	getTableColumns                           string
 	getObsCountByVariableAndEntity            string
 	getEntityInfoTriples                      string
@@ -340,6 +341,12 @@ var statements = struct {
 	getAllEntitiesAndVariables: `
 		SELECT DISTINCT entity, variable
 		FROM observations;
+	`,
+	getVariableCoverage: `
+		SELECT entity, variable, MIN(date) AS min_date, MAX(date) AS max_date
+		FROM observations
+		WHERE value != ''
+		GROUP BY entity, variable;
 	`,
 	// Query for column names in a table. Table name must be added via string interpolation.
 	getTableColumns: `

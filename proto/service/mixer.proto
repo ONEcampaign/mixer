@@ -34,6 +34,7 @@ import "query.proto";
 import "stat.proto";
 import "stat_var.proto";
 import "recon.proto";
+import "coverage.proto";
 
 import "v1/properties.proto";
 import "v1/property_values.proto";
@@ -173,7 +174,18 @@ service Mixer {
   rpc FilterStatVarsByEntity(FilterStatVarsByEntityRequest)
       returns (FilterStatVarsByEntityResponse) {
     option (google.api.http) = {
-      post : "/v2/variable/filter" 
+      post : "/v2/variable/filter"
+      body : "*"
+    };
+  }
+
+  // Returns precomputed date coverage for the requested variables (and
+  // optionally entities) from the in-memory coverage map. Custom-DC only;
+  // absent variables and pairs are omitted from the response.
+  rpc V2VariableCoverage(VariableCoverageRequest)
+      returns (VariableCoverageResponse) {
+    option (google.api.http) = {
+      post : "/v2/variable/coverage"
       body : "*"
     };
   }
