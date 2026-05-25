@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"sync/atomic"
 
 	"github.com/datacommonsorg/mixer/internal/metrics"
 	pb "github.com/datacommonsorg/mixer/internal/proto"
@@ -58,8 +59,11 @@ type Cache struct {
 	sqlProvenances map[string]*pb.Facet
 	// SQL database entity, variable existence pairs
 	sqlExistenceMap map[util.EntityVariable]struct{}
-	// SQL database per-(entity,variable) date coverage map
-	sqlCoverageMap map[util.EntityVariable]sqlquery.DateRange
+	// SQL database per-(entity,variable) date coverage map, built
+	// asynchronously after startup (the underlying query is a full
+	// observations scan that can take minutes on a large dataset). nil until
+	// the build completes; readers must go through the atomic pointer.
+	sqlCoverageMap atomic.Pointer[map[util.EntityVariable]sqlquery.DateRange]
 	// Map of SV dcid to list of inputPropertyExpressions for StatisticalCalculations.
 	svFormulas map[string][]string
 	// CacheOption for this Cache object
@@ -119,7 +123,10 @@ func (c *Cache) SQLCoverageMap(ctx context.Context) map[util.EntityVariable]sqlq
 		slog.Warn("Unexpected access to uninitialized Cache.SQLCoverageMap")
 	}
 	metrics.RecordCachedataRead(ctx, "sql_coverage_map")
-	return c.sqlCoverageMap
+	if p := c.sqlCoverageMap.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 func (c *Cache) SVFormula(ctx context.Context) map[string][]string {
@@ -184,11 +191,23 @@ func NewCache(
 			return nil, err
 		}
 		c.sqlExistenceMap = sqlExistenceMap
-		sqlCoverageMap, err := sqlquery.VariableCoverage(ctx, &store.SQLClient)
-		if err != nil {
-			return nil, err
-		}
-		c.sqlCoverageMap = sqlCoverageMap
+		// Build the per-(entity,variable) date coverage map asynchronously.
+		// Unlike the existence map (an index-only loose scan), this query reads
+		// MIN/MAX(date) with a value filter that no index covers, so it is a
+		// full scan of the observations table and can take minutes on a large
+		// dataset. Blocking startup on it overruns the serving health check, so
+		// the map is published when ready; until then SQLCoverageMap returns nil
+		// and the date-coverage endpoint reports no coverage (callers fail open).
+		// A build error is logged rather than fatal — date coverage is best-effort.
+		go func() {
+			m, err := sqlquery.VariableCoverage(context.Background(), &store.SQLClient)
+			if err != nil {
+				slog.Error("Failed to build SQL coverage map; date-coverage endpoint will report no coverage", "error", err)
+				return
+			}
+			c.sqlCoverageMap.Store(&m)
+			slog.Info("Built SQL coverage map", "pairs", len(m))
+		}()
 	}
 
 	if options.CacheSVFormula {
@@ -204,10 +223,9 @@ func NewCache(
 // NewCoverageCache creates a minimal Cache with only sqlCoverageMap set.
 // Used in unit tests to exercise the V2VariableCoverage handler.
 func NewCoverageCache(m map[util.EntityVariable]sqlquery.DateRange) *Cache {
-	return &Cache{
-		options:        CacheOptions{CacheSQL: true},
-		sqlCoverageMap: m,
-	}
+	c := &Cache{options: CacheOptions{CacheSQL: true}}
+	c.sqlCoverageMap.Store(&m)
+	return c
 }
 
 // NewDataSourceCache initializes the in-memory mixer cache from DataSources.
