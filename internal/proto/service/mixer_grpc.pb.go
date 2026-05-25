@@ -60,6 +60,7 @@ const (
 	Mixer_V2Observation_FullMethodName                = "/datacommons.Mixer/V2Observation"
 	Mixer_V2RecognizePlaces_FullMethodName            = "/datacommons.Mixer/V2RecognizePlaces"
 	Mixer_FilterStatVarsByEntity_FullMethodName       = "/datacommons.Mixer/FilterStatVarsByEntity"
+	Mixer_V2VariableCoverage_FullMethodName           = "/datacommons.Mixer/V2VariableCoverage"
 	Mixer_V2BulkVariableInfo_FullMethodName           = "/datacommons.Mixer/V2BulkVariableInfo"
 	Mixer_V2BulkVariableGroupInfo_FullMethodName      = "/datacommons.Mixer/V2BulkVariableGroupInfo"
 	Mixer_Query_FullMethodName                        = "/datacommons.Mixer/Query"
@@ -133,6 +134,10 @@ type MixerClient interface {
 	V2RecognizePlaces(ctx context.Context, in *proto.RecognizePlacesRequest, opts ...grpc.CallOption) (*proto.RecognizePlacesResponse, error)
 	// Filters a list of stat vars using a list of entities (places or sources).
 	FilterStatVarsByEntity(ctx context.Context, in *proto.FilterStatVarsByEntityRequest, opts ...grpc.CallOption) (*proto.FilterStatVarsByEntityResponse, error)
+	// Returns precomputed date coverage for the requested variables (and
+	// optionally entities) from the in-memory coverage map. Custom-DC only;
+	// absent variables and pairs are omitted from the response.
+	V2VariableCoverage(ctx context.Context, in *proto.VariableCoverageRequest, opts ...grpc.CallOption) (*proto.VariableCoverageResponse, error)
 	V2BulkVariableInfo(ctx context.Context, in *v1.BulkVariableInfoRequest, opts ...grpc.CallOption) (*v1.BulkVariableInfoResponse, error)
 	V2BulkVariableGroupInfo(ctx context.Context, in *v1.BulkVariableGroupInfoRequest, opts ...grpc.CallOption) (*v1.BulkVariableGroupInfoResponse, error)
 	// Query DataCommons Graph with Sparql.
@@ -363,6 +368,15 @@ func (c *mixerClient) V2RecognizePlaces(ctx context.Context, in *proto.Recognize
 func (c *mixerClient) FilterStatVarsByEntity(ctx context.Context, in *proto.FilterStatVarsByEntityRequest, opts ...grpc.CallOption) (*proto.FilterStatVarsByEntityResponse, error) {
 	out := new(proto.FilterStatVarsByEntityResponse)
 	err := c.cc.Invoke(ctx, Mixer_FilterStatVarsByEntity_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mixerClient) V2VariableCoverage(ctx context.Context, in *proto.VariableCoverageRequest, opts ...grpc.CallOption) (*proto.VariableCoverageResponse, error) {
+	out := new(proto.VariableCoverageResponse)
+	err := c.cc.Invoke(ctx, Mixer_V2VariableCoverage_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -833,6 +847,10 @@ type MixerServer interface {
 	V2RecognizePlaces(context.Context, *proto.RecognizePlacesRequest) (*proto.RecognizePlacesResponse, error)
 	// Filters a list of stat vars using a list of entities (places or sources).
 	FilterStatVarsByEntity(context.Context, *proto.FilterStatVarsByEntityRequest) (*proto.FilterStatVarsByEntityResponse, error)
+	// Returns precomputed date coverage for the requested variables (and
+	// optionally entities) from the in-memory coverage map. Custom-DC only;
+	// absent variables and pairs are omitted from the response.
+	V2VariableCoverage(context.Context, *proto.VariableCoverageRequest) (*proto.VariableCoverageResponse, error)
 	V2BulkVariableInfo(context.Context, *v1.BulkVariableInfoRequest) (*v1.BulkVariableInfoResponse, error)
 	V2BulkVariableGroupInfo(context.Context, *v1.BulkVariableGroupInfoRequest) (*v1.BulkVariableGroupInfoResponse, error)
 	// Query DataCommons Graph with Sparql.
@@ -968,6 +986,9 @@ func (UnimplementedMixerServer) V2RecognizePlaces(context.Context, *proto.Recogn
 }
 func (UnimplementedMixerServer) FilterStatVarsByEntity(context.Context, *proto.FilterStatVarsByEntityRequest) (*proto.FilterStatVarsByEntityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FilterStatVarsByEntity not implemented")
+}
+func (UnimplementedMixerServer) V2VariableCoverage(context.Context, *proto.VariableCoverageRequest) (*proto.VariableCoverageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method V2VariableCoverage not implemented")
 }
 func (UnimplementedMixerServer) V2BulkVariableInfo(context.Context, *v1.BulkVariableInfoRequest) (*v1.BulkVariableInfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method V2BulkVariableInfo not implemented")
@@ -1412,6 +1433,24 @@ func _Mixer_FilterStatVarsByEntity_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MixerServer).FilterStatVarsByEntity(ctx, req.(*proto.FilterStatVarsByEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mixer_V2VariableCoverage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(proto.VariableCoverageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MixerServer).V2VariableCoverage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mixer_V2VariableCoverage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MixerServer).V2VariableCoverage(ctx, req.(*proto.VariableCoverageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2368,6 +2407,10 @@ var Mixer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FilterStatVarsByEntity",
 			Handler:    _Mixer_FilterStatVarsByEntity_Handler,
+		},
+		{
+			MethodName: "V2VariableCoverage",
+			Handler:    _Mixer_V2VariableCoverage_Handler,
 		},
 		{
 			MethodName: "V2BulkVariableInfo",

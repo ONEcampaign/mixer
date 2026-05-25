@@ -454,6 +454,27 @@ func (sc *SQLClient) GetAllEntitiesAndVariables(ctx context.Context) ([]*EntityV
 	return rows, nil
 }
 
+// GetVariableCoverageRows returns per-(entity,variable) min/max date ranges.
+func (sc *SQLClient) GetVariableCoverageRows(ctx context.Context) ([]*VariableCoverageRow, error) {
+	defer util.TimeTrack(time.Now(), "SQL: GetVariableCoverageRows")
+
+	rows := []*VariableCoverageRow{}
+
+	stmt := statement{
+		query: statements.getVariableCoverage,
+	}
+
+	err := sc.queryAndCollect(
+		ctx,
+		stmt,
+		&rows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 // GetAllProvenances returns info on all provenances in the DB.
 func (sc *SQLClient) GetAllProvenances(ctx context.Context) ([]*ProvenanceInfo, error) {
 	defer util.TimeTrack(time.Now(), "SQL: GetAllProvenances")

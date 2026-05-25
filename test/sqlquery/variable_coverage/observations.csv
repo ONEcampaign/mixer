@@ -1,0 +1,12 @@
+entity,variable,date,value,provenance,unit,scaling_factor,measurement_method,observation_period,properties
+country/KEN,var1,2010,100,custom,,,,,
+country/KEN,var1,2015,200,custom,,,,,
+country/USA,var1,2012,300,custom,,,,,
+country/USA,var1,2020,400,custom,,,,,
+country/KEN,var2,2005,10,custom,,,,,
+country/KEN,var2,2008,,custom,,,,,
+country/MEX,var3,2015-03,50,custom,,,,,
+country/MEX,var3,2018,60,custom,,,,,
+,var4,2000,1,custom,,,,,
+country/BRA,var4,2005,2,custom,,,,,
+,var4,2010,3,custom,,,,,

@@ -58,6 +58,8 @@ type Cache struct {
 	sqlProvenances map[string]*pb.Facet
 	// SQL database entity, variable existence pairs
 	sqlExistenceMap map[util.EntityVariable]struct{}
+	// SQL database per-(entity,variable) date coverage map
+	sqlCoverageMap map[util.EntityVariable]sqlquery.DateRange
 	// Map of SV dcid to list of inputPropertyExpressions for StatisticalCalculations.
 	svFormulas map[string][]string
 	// CacheOption for this Cache object
@@ -110,6 +112,14 @@ func (c *Cache) SQLExistenceMap(ctx context.Context) map[util.EntityVariable]str
 	}
 	metrics.RecordCachedataRead(ctx, "sql_existence_map")
 	return c.sqlExistenceMap
+}
+
+func (c *Cache) SQLCoverageMap(ctx context.Context) map[util.EntityVariable]sqlquery.DateRange {
+	if !c.options.CacheSQL {
+		slog.Warn("Unexpected access to uninitialized Cache.SQLCoverageMap")
+	}
+	metrics.RecordCachedataRead(ctx, "sql_coverage_map")
+	return c.sqlCoverageMap
 }
 
 func (c *Cache) SVFormula(ctx context.Context) map[string][]string {
@@ -174,6 +184,11 @@ func NewCache(
 			return nil, err
 		}
 		c.sqlExistenceMap = sqlExistenceMap
+		sqlCoverageMap, err := sqlquery.VariableCoverage(ctx, &store.SQLClient)
+		if err != nil {
+			return nil, err
+		}
+		c.sqlCoverageMap = sqlCoverageMap
 	}
 
 	if options.CacheSVFormula {
@@ -184,6 +199,15 @@ func NewCache(
 		c.svFormulas = svFormulas
 	}
 	return c, nil
+}
+
+// NewCoverageCache creates a minimal Cache with only sqlCoverageMap set.
+// Used in unit tests to exercise the V2VariableCoverage handler.
+func NewCoverageCache(m map[util.EntityVariable]sqlquery.DateRange) *Cache {
+	return &Cache{
+		options:        CacheOptions{CacheSQL: true},
+		sqlCoverageMap: m,
+	}
 }
 
 // NewDataSourceCache initializes the in-memory mixer cache from DataSources.
