@@ -129,6 +129,16 @@ func fetchSQL(
 		return nil, err
 	}
 
+	return buildTriplesResponse(nodes, triples, entityInfos, direction), nil
+}
+
+// buildTriplesResponse groups SQL triples into the property-values response shape.
+func buildTriplesResponse(
+	nodes []string,
+	triples []*sqldb.Triple,
+	entityInfos map[string]*entityInfo,
+	direction string,
+) map[string]map[string]map[string][]*pb.EntityInfo {
 	resp := map[string]map[string]map[string][]*pb.EntityInfo{}
 	for _, node := range nodes {
 		resp[node] = map[string]map[string][]*pb.EntityInfo{}
@@ -142,6 +152,12 @@ func fetchSQL(
 		} else {
 			nodeDcid = row.ObjectID
 			entityDcid = row.SubjectID
+		}
+		// The SQL join can match a stored DCID that differs from the requested
+		// node under case/accent-insensitive or PAD SPACE collations (the
+		// MySQL default), so the key may not have been pre-seeded above.
+		if _, ok := resp[nodeDcid]; !ok {
+			resp[nodeDcid] = map[string]map[string][]*pb.EntityInfo{}
 		}
 		if _, ok := resp[nodeDcid][row.Predicate]; !ok {
 			resp[nodeDcid][row.Predicate] = map[string][]*pb.EntityInfo{}
@@ -163,7 +179,7 @@ func fetchSQL(
 			},
 		)
 	}
-	return resp, nil
+	return resp
 }
 
 // executeEntityInfoSQL executes the SQL query to fetch entity info (name and type) of the specified dcids.
